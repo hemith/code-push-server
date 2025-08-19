@@ -99,30 +99,53 @@ export class RedisManager {
 
   constructor() {
     if (process.env.REDIS_HOST && process.env.REDIS_PORT) {
-      const redisConfig = {
+      const redisConfig: any = {
         host: process.env.REDIS_HOST,
-        port: process.env.REDIS_PORT,
-        auth_pass: process.env.REDIS_KEY,
-        tls: {
-          // Note: Node defaults CA's to those trusted by Mozilla
-          rejectUnauthorized: true,
-        },
+        port: parseInt(process.env.REDIS_PORT || '6379'),
       };
+      
+      // Only add auth if REDIS_KEY is provided
+      if (process.env.REDIS_KEY) {
+        redisConfig.auth_pass = process.env.REDIS_KEY;
+      }
+      
+      // Only add TLS if explicitly enabled
+      if (process.env.REDIS_TLS === 'true') {
+        redisConfig.tls = {
+          rejectUnauthorized: true,
+        };
+      }
+      
       this._opsClient = redis.createClient(redisConfig);
       this._metricsClient = redis.createClient(redisConfig);
+      
       this._opsClient.on("error", (err: Error) => {
-        console.error(err);
+        console.error('Redis ops client error:', err);
       });
 
       this._metricsClient.on("error", (err: Error) => {
-        console.error(err);
+        console.error('Redis metrics client error:', err);
       });
 
       this._promisifiedOpsClient = new PromisifiedRedisClient(this._opsClient);
       this._promisifiedMetricsClient = new PromisifiedRedisClient(this._metricsClient);
-      this._setupMetricsClientPromise = this._promisifiedMetricsClient
+      
+      // Create a timeout wrapper to prevent infinite hanging
+      const setupTimeout = q.Promise<void>((resolve, reject) => {
+        setTimeout(() => {
+          reject(new Error('Redis setup timed out after 10 seconds'));
+        }, 10000);
+      });
+      
+      const setupPromise = this._promisifiedMetricsClient
         .select(RedisManager.METRICS_DB)
         .then(() => this._promisifiedMetricsClient.set("health", "health"));
+      
+      this._setupMetricsClientPromise = q.race([setupPromise, setupTimeout])
+        .catch((err: any) => {
+          console.error('Redis setup failed:', err);
+          throw err;
+        });
     } else {
       console.warn("No REDIS_HOST or REDIS_PORT environment variable configured.");
     }
