@@ -64,6 +64,8 @@ export function start(done: (err?: any, server?: express.Express, storage?: Stor
       const appInsights = api.appInsights();
       const redisManager = new RedisManager();
 
+      app.set('trust proxy', 1);
+
       // First, to wrap all requests and catch all exceptions.
       app.use(domain);
 
