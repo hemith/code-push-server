@@ -5,6 +5,7 @@ import * as semver from "semver";
 import { UpdateCheckCacheResponse, UpdateCheckRequest, UpdateCheckResponse } from "../types/rest-definitions";
 import { Package } from "../storage/storage";
 import { isUnfinishedRollout } from "./rollout-selector";
+import { fixDownloadUrl } from './fixDownloadUrl';
 
 interface UpdatePackage {
   response: UpdateCheckResponse;
@@ -114,10 +115,10 @@ function getUpdatePackage(packageHistory: Package[], request: UpdateCheckRequest
     latestSatisfyingEnabledPackage.diffPackageMap &&
     latestSatisfyingEnabledPackage.diffPackageMap[request.packageHash]
   ) {
-    updateDetails.downloadURL = latestSatisfyingEnabledPackage.diffPackageMap[request.packageHash].url;
+    updateDetails.downloadURL = fixDownloadUrl(latestSatisfyingEnabledPackage.diffPackageMap[request.packageHash].url);
     updateDetails.packageSize = latestSatisfyingEnabledPackage.diffPackageMap[request.packageHash].size;
   } else {
-    updateDetails.downloadURL = latestSatisfyingEnabledPackage.blobUrl;
+    updateDetails.downloadURL = fixDownloadUrl(latestSatisfyingEnabledPackage.blobUrl);
     updateDetails.packageSize = latestSatisfyingEnabledPackage.size;
   }
 
